@@ -90,9 +90,9 @@ public:
         } // end while   
     }
 
-    void async_watch(const std::string& key, std::function<void(WatchResponse &res)> cb) {
+    void async_watch(const std::string& key, std::function<void(WatchResponse &res)> cb ,const std::string& watchEndRange = "") {
             
-        AsyncWatcherCall* watch_call = new AsyncWatcherCall(key, &m_completionQueue, this);
+        AsyncWatcherCall* watch_call = new AsyncWatcherCall(key, &m_completionQueue, this,watchEndRange);
         
         watch_call->send();
         std::cerr << "Adding callback to map with tag: " << watch_call->get_tag() << std::endl;
@@ -125,8 +125,9 @@ private:
 
     public:
 
-        AsyncWatcherCall(const std::string &key, CompletionQueue *cq, Watcher *watcher) :
-            m_key(key), 
+        AsyncWatcherCall(const std::string &key, CompletionQueue *cq, Watcher *watcher,const std::string& watchEndRange) :
+            m_key(key),
+            m_endRange(watchEndRange),
             m_cq(cq),
             m_watcher(watcher)
         {
@@ -146,8 +147,13 @@ private:
         
         void send() {
                 WatchRequest watchRequest;
-                watchRequest.mutable_create_request()->set_key(m_key);
-          
+                if(m_endRange.empty()){
+                    watchRequest.mutable_create_request()->set_key(m_key);
+                }
+                else{
+                    watchRequest.mutable_create_request()->set_key(m_key);
+                    watchRequest.mutable_create_request()->set_range_end(m_endRange);
+                }
                 bool ok= false;
                 void * got_tag;
                 m_stream->Write(watchRequest, (void *)m_tag);
@@ -163,6 +169,7 @@ private:
         ClientContext           m_context;
         void *                  m_tag;
         std::string             m_key;
+        std::string             m_endRange; //for watching by prefix
         WatchResponse           m_watchResponse;
         Status                  m_status;
         CompletionQueue         *m_cq;
